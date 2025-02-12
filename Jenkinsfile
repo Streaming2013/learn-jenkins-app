@@ -130,7 +130,7 @@ pipeline {
             }
 
             environment {
-                CI_ENVIRONMENT_URL = 'PUT YOUR NETLIFY SITE URL HERE'
+                CI_ENVIRONMENT_URL = 'https://beamish-baklava-f41394.netlify.app'
             }
 
             steps {
