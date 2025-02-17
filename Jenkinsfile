@@ -3,14 +3,12 @@ pipeline {
 
     environment {
         REACT_APP_VERSION = "1.0.$BUILD_ID"
-        AWS_DEFAULT_REGION = 'us-east-1'
         APP_NAME = 'learnjenkinsapp'
+        AWS_DEFAULT_REGION = 'us-east-1'
+        AWS_DOCKER_REGISTRY = '396608794617.dkr.ecr.us-east-1.amazonaws.com'
         AWS_ECS_CLUSTER = 'LearnJenkinsApp-Cluster-Prod'
         AWS_ECS_SERVICE_PROD = 'LearnJenkinsApp-Service-Prod'
         AWS_ECS_TD_PROD = 'LearnJenkinsApp-TaskDefinition-Prod'
-        AWS_DOCKER_REGISTRY = '396608794617.dkr.ecr.us-east-1.amazonaws.com'
-
-
     }
 
     stages {
@@ -35,8 +33,7 @@ pipeline {
         }
 
         stage('Build Docker image') {
-
-             agent {
+            agent {
                 docker {
                     image 'my-aws-cli'
                     reuseNode true
@@ -48,36 +45,32 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'my-aws', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')]) {
                     sh '''
                         docker build -t $AWS_DOCKER_REGISTRY/$APP_NAME:$REACT_APP_VERSION .
-                        aws ecr get-login-password | docker login --username --password-stdin AWS $AWS_DOCKER_REGISTRY
+                        aws ecr get-login-password | docker login --username AWS --password-stdin $AWS_DOCKER_REGISTRY
                         docker push $AWS_DOCKER_REGISTRY/$APP_NAME:$REACT_APP_VERSION
                     '''
                 }
             }
-        }
+        }        
 
         stage('Deploy to AWS') {
             agent {
                 docker {
                     image 'my-aws-cli'
                     reuseNode true
-                    args "-u root --entrypoint=''"
+                    args "--entrypoint=''"
                 }
             }
-            environment {
-                AWS_S3_BUCKET = 'learn-jenkin14022025'
-            }
+
             steps {
                 withCredentials([usernamePassword(credentialsId: 'my-aws', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')]) {
                     sh '''
                         aws --version
-                        yum install jq -y
                         LATEST_TD_REVISION=$(aws ecs register-task-definition --cli-input-json file://aws/task-definition-prod.json | jq '.taskDefinition.revision')
-                        echo $LATEST_TD_REVISION
                         aws ecs update-service --cluster $AWS_ECS_CLUSTER --service $AWS_ECS_SERVICE_PROD --task-definition $AWS_ECS_TD_PROD:$LATEST_TD_REVISION
                         aws ecs wait services-stable --cluster $AWS_ECS_CLUSTER --services $AWS_ECS_SERVICE_PROD
                     '''
                 }
             }
-        }
+        }        
     }
 }
